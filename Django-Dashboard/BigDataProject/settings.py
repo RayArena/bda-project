@@ -17,16 +17,27 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+# Load .env configuration if present
+try:
+    from dotenv import load_dotenv
+    root_env = BASE_DIR.parent / ".env"
+    if root_env.exists():
+        load_dotenv(root_env)
+    else:
+        load_dotenv()
+except ImportError:
+    pass
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-qkl0cdk^3k(_)oc(gx#obz(g8)t#40t)6)8%c!%2c(0nl4b)&#'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-qkl0cdk^3k(_)oc(gx#obz(g8)t#40t)6)8%c!%2c(0nl4b)&#')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition

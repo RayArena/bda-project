@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Spark & Java
+derby.log
+metastore_db/
+checkpoint/
+checkpoints/
+spark-warehouse/
+hadoop/
+
+# Local Kafka binaries/data
+kafka_2.*/
+kafka-logs/
+zookeeper-data/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Django collected static
+Django-Dashboard/static/
+
+# Environment files
+.env

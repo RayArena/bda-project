@@ -1,210 +1,232 @@
-# Big Data Project: Real-Time Twitter Sentiment Analysis Using Kafka, Spark (MLLib & Streaming), MongoDB and Django.
+# Big Data Project: Real-Time Twitter Sentiment Analysis
 
-## Overview
+Real-time Twitter sentiment analysis and classification using **Apache Kafka**, **Apache Spark (PySpark MLLib & Streaming)**, **MongoDB**, and a **Django Dashboard** — running completely **natively without Docker**.
 
-This repository contains a Big Data project focused on real-time sentiment analysis of Twitter data (classification of tweets). The project leverages various technologies to collect, process, analyze, and visualize sentiment data from tweets in real-time.
+---
 
-## Project Architecture
+## 🏛️ Project Architecture
 
-The project is built using the following components:
-
-- **Apache Kafka**: Used for real-time data ingestion from Twitter DataSet.
-- **Spark Streaming**: Processes the streaming data from Kafka to perform sentiment analysis.
-- **MongoDB**: Stores the processed sentiment data.
-- **Django**: Serves as the web framework for building a real-time dashboard to visualize the sentiment analysis results.
-- **chart.js** & **matplotlib** : for plotting.
-
-- This is the project plan :
-   ![project img](imgs/flow.png)
-
-## Features
-
-- **Real-time Data Ingestion**: Collects live tweets using Kafka from the Twitter DataSet.
-- **Stream Processing**: Utilizes Spark Streaming to process and analyze the data in real-time.
-- **Sentiment Analysis**: Classifies tweets into different sentiment categories (positive, negative, neutral) using natural language processing (NLP) techniques.
-- **Data Storage**: Stores the sentiment analysis results in MongoDB for persistence.
-- **Visualization**: Provides a real-time dashboard built with Django to visualize the sentiment trends and insights.
-
-## Data description:
-
-In This Project I'm using a Dataset (twitter_training.csv and twitter_validation.csv) to create pyspark Model and for create live tweets using Kafka. Each line of the "twitter_training.csv" learning database represents a Tweet, it contains over 74682 lines;
-
-The data types of Features are:
-- Tweet ID: int
-- Entity: string
-- Sentiment: string (Target)
-- Tweet content: string
-
-The validation database “twitter_validation.csv” contains 998 lines (Tweets) with the same features of “twitter_training.csv”.
-
-This is the Data Source:
-https://www.kaggle.com/datasets/jp797498e/twitter-entity-sentiment-analysis
-
-### Use a reviewed TweetClaw or X export
-
-The Kafka producer reads `Kafka-PySpark/twitter_validation.csv`, which expects
-four fields: tweet ID, entity, sentiment, and text. To test newer reviewed
-tweet exports without hand-editing the CSV, convert them first:
-
-```bash
-python tools/normalize_tweet_export.py examples/tweetclaw-reviewed-export.csv \
-  --output Kafka-PySpark/twitter_validation.csv
+```
+[ Twitter Dataset / Producer ]
+              │
+              ▼
+       [ Apache Kafka ]
+         (Topic: numtest)
+              │
+              ▼
+   [ PySpark Streaming Consumer ]
+   (Logistic Regression NLP Model)
+              │
+              ▼
+        [ MongoDB Database ]
+        (Database: bigdata_project, Collection: tweets)
+              │
+              ▼
+       [ Django Dashboard ]
+    (Real-time charts, analytics, and custom tweet classifier)
 ```
 
-The converter accepts common Twitter/X and TweetClaw CSV headers such as
-`tweet_id`, `account`, `sentiment`, `label`, `text`, `tweet`, `full_text`, and
-`content`. Sentiment values must map to `Negative`, `Positive`, `Neutral`, or
-`Irrelevant`. TweetClaw exports from https://github.com/Xquik-dev/tweetclaw are
-best used after a review step adds one of those sentiment labels.
-
-## Repository Structure
-
-- **Django-Dashboard** : this folder contains Dashboard Django Application
-- **Kafka-PySpark** : this folder contains kafka provider and pyspark streaming (kafka consumer).
-- **ML PySpark Model** : this folder contains the trained model with jupyter notebook and datasets.
-- **zk-single-kafka-single.yml** : Download and install Apache Kafka in docker.
-- **bigdataproject rapport** : a brief report about the project (in french).
-
-
-## Getting Started
-
-### Prerequisites
-
-To run this project, you will need the following installed on your system:
-
-- Docker (for runing Kafka)
-- Python 3.x
-- Apache Kafka
-- Apache Spark (PySpark for python)
-- MongoDB
-- Django
-
-### Installation
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/drisskhattabi6/Real-Time-Twitter-Sentiment-Analysis.git
-   cd Real-Time-Twitter-Sentiment-Analysis
-   ```
-   
-2. **Installing Docker Desktop**
-
-3. **Set up Kafka**:
-   - Download and install Apache Kafka in docker using :
-   ```bash
-   docker-compose -f zk-single-kafka-single.yml up -d
-   ```
-
-5. **Set up MongoDB**:
-   - Download and install MongoDB.
-     - It is recommended to install also **MongoDBCompass** to visualize data and makes working with mongodb easier.
-
-6. **Install Python dependencies**:
-   - To install pySpark - PyMongo - Django ...
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### Running the Project
-
-   Note : you will need MongoDB for Running the Kafka and Spark Streaming application and for Running Django Dashboard application.
-   
-   - **Start MongoDB**:
-      - using command line :
-      ```bash
-      sudo systemctl start mongod
-      ```
-      - then use **MongoDBCompass** (Recommended).
-
-#### Running the Kafka and Spark Streaming application :
-
-1. **Change the directory to the application**:
-   ```bash
-   cd Kafka-PySpark
-   ```
-
-2. **Start Kafka in docker**:
-   - using command line :
-   ```bash
-   docker exec -it <kafka-container-id> /bin/bash
-   ```
-   - or using docker desktop :
-     
-     ![ docker desktop img](imgs/img5.png)
-
-4. **Run kafka Zookeeper and a Broker**:
-   ```bash
-   kafka-topics --create --topic twitter --bootstrap-server localhost:9092
-   kafka-topics --describe --topic twitter --bootstrap-server localhost:9092
-   ```
-
-5. **Run kafka provider app**:
-   ```bash
-   py producer-validation-tweets.py
-   ```
-
-6. **Run pyspark streaming (kafka consumer) app**:
-   ```bash
-   py consumer-pyspark.py
-   ```
-
-![Running the Kafka and Spark Streaming application img](imgs/img6.png)
-
-this is an img of the MongoDBCompass after Running the Kafka and Spark Streaming application :
-
-![MongoDBCompass img](imgs/img4.png)
-
-#### Running Django Dashboard application :
-
-1. **Change the directory to the application**:
-   ```bash
-   cd Django-Dashboard
-   ```
-
-2. **Creating static folder**:
-   ```bash
-   python manage.py collectstatic
-   ```
-
-3. **Run the Django server**:
-   ```bash
-   python manage.py runserver
-   ```
-
-4. **Access the Dashboard**:
-   Open your web browser and go to `http://127.0.0.1:8000` to view the real-time sentiment analysis dashboard.
-
-![the Dashboard](imgs/img2.png)
-
-![Running the Dashboard](imgs/img3.png)
-
-## More informations : 
-
-- Django Dashboard get the data from MongoDb DataBase.
-- the User can classify his owne text in `http://127.0.0.1:8000/classify` link.
-- in the Dashboard, There is a table contains tweets with labels.
-- in the Dashboard, There is 3 statistics or plots : labels rates - pie plot - bar plot.
-
-
-## Team :
-
-- [Khattabi Idriss](https://github.com/drisskhattabi6) 
-- [Boufarhi Ayman](https://github.com/aymanboufarhi) 
-- [Abdelali IBN TABET](https://github.com/abd-ibn)
-
-## Supervised By : 
-
-- Prof. **Yasyn El Yusufi**
+- **Apache Kafka**: Ingests streaming tweet records.
+- **Spark Streaming (PySpark)**: Reads streaming tweets from Kafka, runs the ML sentiment classifier, and writes results to MongoDB.
+- **MongoDB**: Persists classified tweets and sentiment statistics.
+- **Django Dashboard**: Visualizes sentiment distribution, top word frequencies, and allows on-demand tweet classification.
 
 ---
 
-Abdelmalek Essaadi University - Faculty of Sciences and Technology of Tangier
+## 📁 Repository Structure
 
-- Master: Artificial Intelligence and Data Science
-- Module: Big Data
+```
+Real-Time-Twitter-Sentiment-Analysis/
+├── Django-Dashboard/            # Django web application
+│   ├── BigDataProject/          # Django project settings & static files
+│   ├── dashboard/               # Dashboard app views, templates & URLs
+│   ├── logistic_regression_model.pkl # Model copy for on-demand classification
+│   └── manage.py                # Django CLI management script
+├── Kafka-PySpark/               # Streaming pipelines
+│   ├── consumer-pyspark.py      # PySpark Kafka consumer & sentiment analyzer
+│   ├── producer-validation-tweets.py # Kafka tweet producer
+│   ├── logistic_regression_model.pkl # PySpark trained PipelineModel
+│   └── twitter_validation.csv   # Validation dataset used for streaming
+├── ML PySpark Model/            # Training datasets & model training notebook
+├── scripts/                     # Convenient native Windows launch scripts
+│   ├── start_local_kafka.bat    # Helper to start Kafka/ZooKeeper
+│   ├── run_producer.bat         # Start Kafka tweet producer
+│   ├── run_consumer.bat         # Start PySpark consumer
+│   └── run_dashboard.bat        # Start Django web server
+├── tools/                       # Utilities (e.g. tweet export normalizer)
+├── requirements.txt             # Python dependencies
+└── README.md                    # Project documentation
+```
 
 ---
 
-- By following the above instructions, you should be able to set up and run the real-time Twitter sentiment analysis project on your local machine. Happy coding!
+## ⚙️ Prerequisites (Local Native Setup)
 
-- Feel free to explore the project and customize it according to your requirements. If you encounter any issues or have any questions, don't hesitate to reach out!
+Ensure you have the following installed on your machine:
+
+1. **Python 3.10+**
+   - Verify: `python --version`
+2. **Java JDK (JDK 8, 11, 17, or 21+)**
+   - Required by Apache Spark and Kafka.
+   - Verify: `java -version`
+   - Set `JAVA_HOME` environment variable (e.g. `C:\Program Files\Java\jdk-23`).
+3. **MongoDB Community Server** (or a free MongoDB Atlas cluster)
+   - Download from: [https://www.mongodb.com/try/download/community](https://www.mongodb.com/try/download/community)
+   - MongoDB Compass (recommended for viewing data): [https://www.mongodb.com/products/tools/compass](https://www.mongodb.com/products/tools/compass)
+4. **Apache Kafka Binary**
+   - Download the Scala binary release (e.g. `kafka_2.13-3.x.x.tgz`) from [https://kafka.apache.org/downloads](https://kafka.apache.org/downloads).
+   - Extract it to a short path without spaces, such as `C:\kafka`.
+
+---
+
+## 🚀 Setup & Execution Guide (Step-by-Step)
+
+### Step 1: Clone Repository & Set Up Python Environment
+
+Open PowerShell or Command Prompt in the project folder:
+
+```powershell
+# 1. Create a Python virtual environment
+python -m venv venv
+
+# 2. Activate the virtual environment
+# On Windows PowerShell:
+.\venv\Scripts\Activate.ps1
+# Or Windows Command Prompt (CMD):
+venv\Scripts\activate.bat
+
+# 3. Install required dependencies
+pip install -r requirements.txt
+```
+
+---
+
+### Step 2: Environment Configuration (.env)
+
+The project includes a `.env` configuration file in the project root:
+- **`MONGO_URI`**: Set to your local MongoDB instance (e.g., `mongodb://localhost:27017/`) or MongoDB Atlas cloud connection URI (`mongodb+srv://...`).
+- **`MONGO_DB_NAME`**: MongoDB database name (default: `bigdata_project`).
+- **`MONGO_COLLECTION`**: MongoDB collection name (default: `tweets`).
+- **`KAFKA_BOOTSTRAP_SERVERS`**: Kafka broker address (default: `localhost:9092`).
+- **`KAFKA_TOPIC`**: Topic name (default: `numtest`).
+
+---
+
+### Step 3: Start MongoDB
+
+Make sure MongoDB is running on `localhost:27017`:
+
+- **Windows Service**: Open `services.msc` and ensure **MongoDB Server** is running, or execute in an Administrator terminal:
+  ```powershell
+  net start MongoDB
+  ```
+- **Manual Start**: If running from a standalone binary:
+  ```powershell
+  mongod --dbpath "C:\data\db"
+  ```
+
+---
+
+### Step 3: Start Apache Kafka (Natively on Windows)
+
+Open a new terminal window for ZooKeeper and another for Kafka Broker (assuming Kafka is extracted at `C:\kafka`):
+
+#### 3.1 Start ZooKeeper:
+```cmd
+C:\kafka\bin\windows\zookeeper-server-start.bat C:\kafka\config\zookeeper.properties
+```
+
+#### 3.2 Start Kafka Broker:
+In a **new terminal**:
+```cmd
+C:\kafka\bin\windows\kafka-server-start.bat C:\kafka\config\server.properties
+```
+
+*(Optional) Create the topic `numtest` (Kafka auto-creates topics by default, but you can create it explicitly):*
+```cmd
+C:\kafka\bin\windows\kafka-topics.bat --create --topic numtest --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+```
+
+> **Tip:** You can also run `scripts\start_local_kafka.bat` from this repository for an interactive menu.
+
+---
+
+### Step 4: Run the PySpark Consumer
+
+In a **new terminal** (with your Python virtual environment activated):
+
+```powershell
+python Kafka-PySpark\consumer-pyspark.py
+```
+*(Or double-click `scripts\run_consumer.bat`)*
+
+This script:
+1. Connects to Kafka topic `numtest`.
+2. Connects to MongoDB `bigdata_project` database.
+3. Loads the trained ML sentiment model.
+4. Waits to consume and classify incoming tweets.
+
+---
+
+### Step 5: Run the Kafka Tweet Producer
+
+In a **new terminal** (with your Python virtual environment activated):
+
+```powershell
+python Kafka-PySpark\producer-validation-tweets.py
+```
+*(Or double-click `scripts\run_producer.bat`)*
+
+This script reads tweets from `Kafka-PySpark/twitter_validation.csv` and streams them into Kafka every 2 seconds. You will see the consumer classify the sentiments in real-time and store them in MongoDB!
+
+---
+
+### Step 6: Start the Django Web Dashboard
+
+In a **new terminal** (with your Python virtual environment activated):
+
+```powershell
+cd Django-Dashboard
+
+# Apply initial migrations
+python manage.py migrate
+
+# Collect static files
+python manage.py collectstatic --noinput
+
+# Start the web server
+python manage.py runserver
+```
+*(Or double-click `scripts\run_dashboard.bat`)*
+
+---
+
+### Step 7: Open the Dashboard
+
+Open your web browser and navigate to:
+
+👉 **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
+
+- **Dashboard**: Displays total tweets processed, sentiment percentage breakdown (Positive, Negative, Neutral, Irrelevant), and top word frequency charts.
+- **Custom Classifier**: Visit **[http://127.0.0.1:8000/classify](http://127.0.0.1:8000/classify)** to enter any custom tweet text and get an instant sentiment prediction!
+
+---
+
+## 🛠️ Helpful Utilities
+
+### Converting Custom Tweet Exports
+To stream custom tweets from Twitter/X or TweetClaw into the pipeline:
+```powershell
+python tools\normalize_tweet_export.py examples\tweetclaw-reviewed-export.csv --output Kafka-PySpark\twitter_validation.csv
+```
+
+---
+
+## 💡 Troubleshooting & Notes
+
+1. **Windows Java Error / PySpark**:
+   - Ensure `JAVA_HOME` points to your JDK directory without a trailing slash (e.g., `set JAVA_HOME=C:\Program Files\Java\jdk-23`).
+2. **Kafka Path Length on Windows**:
+   - Keep your Kafka folder near the drive root (e.g., `C:\kafka`) to avoid Windows `The input line is too long` errors in batch files.
+3. **MongoDB Connection**:
+   - PySpark and Django default to `mongodb://localhost:27017/`. Ensure MongoDB is listening on port 27017 before starting the consumer.

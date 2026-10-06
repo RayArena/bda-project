@@ -1,79 +1,60 @@
+import os
+import re
+from pathlib import Path
+import nltk
+
+import sys
+
+# Ensure PYSPARK_PYTHON and HADOOP_HOME are set on Windows
+os.environ["PYSPARK_PYTHON"] = sys.executable
+os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+hadoop_dir = ROOT_DIR / "hadoop"
+if hadoop_dir.exists():
+    os.environ["HADOOP_HOME"] = str(hadoop_dir)
+    os.environ["PATH"] = str(hadoop_dir / "bin") + os.pathsep + os.environ.get("PATH", "")
+
 from pyspark.ml import PipelineModel
 from pyspark.sql import SparkSession
-import re
-import nltk
-nltk.download('stopwords')
-nltk.download('punkt')
 
-# from pymongo import MongoClient
+nltk.download('stopwords', quiet=True)
+nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
 
-# import os
-# print(" the model is exist : ", os.path.exists("logistic_regression_model.pkl"))
-
-# Establish connection to MongoDB
-# client = MongoClient('localhost', 27017)
-# db = client['bigdata_project'] 
-# collection = db['tweets'] 
-
-# Assuming you have a SparkSession already created
+# Initialize SparkSession
 spark = SparkSession.builder \
-    .appName("classify tweets") \
+    .appName("classify tweets user") \
+    .config("spark.ui.showConsoleProgress", "false") \
     .getOrCreate()
+spark.sparkContext.setLogLevel("WARN")
 
-# import os
-# print(" the model is exist : ", os.path.exists("../logistic_regression_model.pkl"))
+# Resolve model path dynamically
+BASE_DIR = Path(__file__).resolve().parent.parent
+model_path = BASE_DIR / "logistic_regression_model.pkl"
+if not model_path.exists():
+    model_path = BASE_DIR.parent / "Kafka-PySpark" / "logistic_regression_model.pkl"
 
-# Load the model
-pipeline = PipelineModel.load("logistic_regression_model.pkl")
+pipeline = PipelineModel.load(str(model_path))
 
 def clean_text(text):
     if text is not None:
-        # Remove links starting with https://, http://, www., or containing .com
-        text = re.sub(r'https?://\S+|www\.\S+|S+\.com\S+|youtu\.be/\S+', '', text)
-        
-        # Remove words starting with # or @
+        text = re.sub(r'https?://\S+|www\.\S+|\.com\S+|youtu\.be/\S+', '', text)
         text = re.sub(r'(@|#)\w+', '', text)
-        
-        # Convert to lowercase
         text = text.lower()
-        
-        # Remove non-alphabitic characters
         text = re.sub(r'[^a-zA-Z\s]', '', text)
-        
-        # Remove extra whitespaces
         text = re.sub(r'\s+', ' ', text).strip()
         return text
-    else:
-        return ''
-    
-class_index_mapping = { 0: "Negative", 1: "Positive", 2: "Neutral", 3: "Irrelevant" }
+    return ''
 
+class_index_mapping = {0: "Negative", 1: "Positive", 2: "Neutral", 3: "Irrelevant"}
 
-def classify_text(text: str) :
+def classify_text(text: str) -> str:
     preprocessed_tweet = clean_text(text)
-    data = [(preprocessed_tweet,),]  
-    data = spark.createDataFrame(data, ["Text"])
-    # Apply the pipeline to the new text
-    processed_validation = pipeline.transform(data)
+    data = [(preprocessed_tweet,)]
+    df = spark.createDataFrame(data, ["Text"])
+    processed_validation = pipeline.transform(df)
     prediction = processed_validation.collect()[0][6]
+    label = class_index_mapping.get(int(prediction), "Neutral")
 
-    print("-> Tweet : ", text)
-    print("-> preprocessed_tweet : ", preprocessed_tweet)
-    print("-> Predicted Sentiment : ", prediction)
-    print("-> Predicted Sentiment classname : ", class_index_mapping[int(prediction)])
-    
-
-    # # Prepare document to insert into MongoDB
-    # tweet_doc = {
-    #     "tweet": text,
-    #     "prediction": class_index_mapping[int(prediction)]
-    # }
-
-    # # Insert document into MongoDB collection
-    # collection.insert_one(tweet_doc)
-
-    print("/"*50)
-
-    return class_index_mapping[int(prediction)]
-
-# print("/"*50)
+    print(f"[Classify User] Text: {text} -> Sentiment: {label}")
+    return label
