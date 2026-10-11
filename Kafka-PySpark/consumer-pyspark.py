@@ -127,14 +127,28 @@ for message in consumer:
     data = [(preprocessed_tweet,)]
     df = spark.createDataFrame(data, ["Text"])
     processed_validation = pipeline.transform(df)
-    prediction = processed_validation.collect()[0][6]
+    # Select by column name (robust to pipeline column ordering changes)
+    row = processed_validation.select("prediction", "probability").collect()[0]
+    prediction = row["prediction"]
+    probability = row["probability"]
     sentiment_label = class_index_mapping.get(int(prediction), "Neutral")
+
+    # Model confidence for this prediction = highest class probability.
+    # This is the per-tweet "accuracy"/certainty the model assigns.
+    confidence = round(float(max(probability)) * 100, 2)
+    # Full per-class probability distribution (handy for the dashboard / audits)
+    class_probabilities = {
+        class_index_mapping.get(i, str(i)): round(float(p) * 100, 2)
+        for i, p in enumerate(probability)
+    }
 
     if collection is not None:
         try:
             tweet_doc = {
                 "tweet": tweet,
-                "prediction": sentiment_label
+                "prediction": sentiment_label,
+                "confidence": confidence,
+                "class_probabilities": class_probabilities,
             }
             collection.insert_one(tweet_doc)
             print("[MongoDB] Persisted to database.")
@@ -146,8 +160,9 @@ for message in consumer:
         print(f"-> Original Tweet   : {tweet}")
         print(f"-> Preprocessed     : {preprocessed_tweet}")
         print(f"-> Predicted Label  : {sentiment_label} ({prediction})")
+        print(f"-> Confidence       : {confidence}%")
         print("=" * 60)
     except Exception:
         safe_tweet = tweet.encode('ascii', errors='replace').decode('ascii')
         print(f"-> Original Tweet   : {safe_tweet}")
-        print(f"-> Predicted Label  : {sentiment_label} ({prediction})")
+        print(f"-> Predicted Label  : {sentiment_label} ({prediction}) @ {confidence}%")

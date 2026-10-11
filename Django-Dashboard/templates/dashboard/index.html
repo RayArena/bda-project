@@ -1,140 +1,131 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %} Big Data Project {% endblock title %}
-
+{% block title %} SentimentScope · Dashboard {% endblock title %}
+{% block nav_dashboard %}active{% endblock %}
 
 {% block links %}
-    <!-- <link rel="stylesheet" href="{% static 'css/css-reset.css' %}"> -->
-    <!-- <link rel="stylesheet" href="{% static 'css/normalize.css' %}"> -->
-    <link rel="stylesheet" href="{% static 'css/myCss-fm.css' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 {% endblock links %}
 
-
 {% block content %}
+<div class="wrap">
 
-<header>
-    <div class="container flex-sp-bet">
-        <a href="{% url 'dashboard' %}">
-            <h2 class="logo">Dashboard</h2>
-        </a>
-        <nav class="nav">
-            <ul>
-                <li><a href="{% url 'dashboard' %}"><i class="fa-solid fa-house"></i> Dashboard</a></li>
-                <li><a href="{% url 'classify' %}"><i class="fa-solid fa-user-pen"></i> Classify</a></li>
-            </ul>
-        </nav>
+    <div class="page-head">
+        <h1>Sentiment Dashboard</h1>
+        <p>Real-time Twitter sentiment predictions streamed via Kafka &amp; classified with PySpark.</p>
     </div>
-</header>
 
-<main class="flex-ctr-clm">
-    <div class="flex-ctr-clm">
+    {% if len_data != 0 %}
 
-        {% if len_data != 0 %}
+    <!-- KPI tiles -->
+    <div class="kpi-grid">
+        <div class="card kpi">
+            <div class="kpi-label">Total Tweets</div>
+            <div class="kpi-value">{{ len_data }}</div>
+            <div class="kpi-icon" style="color: var(--accent-2);"><i class="fa-solid fa-database"></i></div>
+            <div class="accent-bar"></div>
+        </div>
+        <div class="card kpi">
+            <div class="kpi-label">Avg. Model Accuracy</div>
+            <div class="kpi-value">{% if overall_avg_confidence %}{{ overall_avg_confidence }}%{% else %}—{% endif %}</div>
+            <div class="kpi-sub">mean prediction confidence</div>
+            <div class="kpi-icon" style="color: var(--positive);"><i class="fa-solid fa-bullseye"></i></div>
+        </div>
+        {% for c in class_stats %}
+        <div class="card kpi">
+            <div class="kpi-label">{{ c.label }}</div>
+            <div class="kpi-value">{{ c.rate }}%</div>
+            <div class="kpi-sub">{{ c.count }} tweets · {{ c.avg_confidence }}% acc.</div>
+            <div class="kpi-icon dot {{ c.label|lower }}"><i class="fa-solid fa-circle"></i></div>
+        </div>
+        {% endfor %}
+    </div>
 
-        <h2>Data Visualization</h2>
-
-        <div class="table_container flex-ctr-str">
+    <!-- Data table -->
+    <div class="card card-pad" style="margin-bottom: 24px;">
+        <div class="card-title"><i class="fa-solid fa-table-list"></i> Classified Tweets</div>
+        <div class="table-scroll">
             <table>
                 <thead>
                     <tr>
-                        <th>Text</th>
-                        <th>Target</th>
+                        <th style="width: 60%;">Tweet</th>
+                        <th>Sentiment</th>
+                        <th style="width: 22%;">Accuracy</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in data %}
                     <tr>
                         <td>{{ item.tweet }}</td>
-                        <td>{{ item.prediction }}</td>
+                        <td><span class="pill {{ item.prediction }}">{{ item.prediction }}</span></td>
+                        <td>
+                            {% if item.confidence %}
+                            <div class="meter">
+                                <div class="bar"><div class="fill" style="width: {{ item.confidence }}%;"></div></div>
+                                <span class="pct">{{ item.confidence }}%</span>
+                            </div>
+                            {% else %}
+                            <span class="pct">—</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-
-        <hr width="75%" color="black" />
-
-        <h2>Data Statistics</h2>
-
-        <div class="stats_container flex-ctr-clm">
-
-            <p style="font-size: 20px; font-weight: 600;">Total Data : <mark>{{ len_data }} </mark></p>
-
-            <div class="display-two flex-center">
-                <div class="flex-ctr-clm">
-                    <canvas id="myChart1"></canvas>
-                </div>
-                <div class="flex-ctr-clm">
-                    <h2>Sentiment Rates per Class</h2>
-                    <ul>
-                        {% for label, rate in sentiment_rates.items %}
-                        <li style="font-size: 22px; font-weight: 600;"> {{ label }} : {{ rate }} %</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
-            <hr width="75%" color="black" />
-            <div class="display-two flex-center" style="flex-direction: column; height: 650px;">
-                    <h3>Top Word Frequencies for each class</h3>
-                    <img src="{% static 'imgs/Word_Frequencies_for_all_classes.png' %}" alt="Word_Frequencies_for_all_classes">
-            </div>
-        </div>
-            
-        {% else %}
-
-        <h1><mark>the DB is Empty!!</mark> </h1>
-
-        {% endif %}
-
     </div>
-</main>
 
+    <!-- Charts row 1 -->
+    <div class="grid-2">
+        <div class="card card-pad">
+            <div class="card-title"><i class="fa-solid fa-chart-pie"></i> Sentiment Distribution</div>
+            <div class="chart-box"><canvas id="pieChart"></canvas></div>
+        </div>
+        <div class="card card-pad">
+            <div class="card-title"><i class="fa-solid fa-chart-column"></i> Tweets per Class</div>
+            <div class="chart-box"><canvas id="barChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Charts row 2 (accuracy-focused) -->
+    <div class="grid-2">
+        <div class="card card-pad">
+            <div class="card-title"><i class="fa-solid fa-bullseye"></i> Average Accuracy per Class</div>
+            <div class="chart-box"><canvas id="confChart"></canvas></div>
+        </div>
+        <div class="card card-pad">
+            <div class="card-title"><i class="fa-solid fa-wave-square"></i> Prediction Confidence Distribution</div>
+            <div class="chart-box"><canvas id="histChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Word frequencies -->
+    <div class="card card-pad" style="margin-bottom: 24px;">
+        <div class="card-title"><i class="fa-solid fa-font"></i> Top Word Frequencies per Class</div>
+        <img class="wordfreq-img" src="{% static 'imgs/Word_Frequencies_for_all_classes.png' %}?v={{ len_data }}"
+             alt="Word frequencies for all classes">
+    </div>
+
+    {% else %}
+
+    <div class="card empty">
+        <i class="fa-solid fa-inbox"></i>
+        <h2>No data yet</h2>
+        <p>The database is empty. Start the Kafka producer &amp; PySpark consumer to stream tweets.</p>
+    </div>
+
+    {% endif %}
+
+</div>
+
+{{ sentiment_counts|json_script:"counts-data" }}
+{{ avg_confidence_per_class|json_script:"conf-data" }}
+{{ confidence_buckets|json_script:"hist-data" }}
 {% endblock content %}
 
-
 {% block scripts %}
+{% if len_data != 0 %}
 <script src="{% static 'js/script.js' %}"></script>
-
-
-<script>
-    var expenses = {{ sentiment_counts|safe }}
-
-    console.log("Expenses:", expenses); 
-
-    var labels = Object.keys(expenses);
-    var amounts = Object.values(expenses);
-
-    var data = {
-        labels: labels,
-        datasets: [{
-            data: amounts,
-            backgroundColor: [
-                'rgba(255, 50, 50)',
-                'rgba(50, 200, 50)',
-                'rgba(50, 50, 200)',
-                'rgba(250, 250, 0)',
-            ]
-        }]
-    };
-
-    var options = {
-        plugins: {
-            legend: {
-                position: 'right' // Position legend at the bottom of the chart
-            }
-        }
-    };
-    
-    var ctx = document.getElementById('myChart1').getContext('2d');
-    var myPieChart = new Chart(ctx, {
-        type: 'pie',
-        data: data,
-        options: options
-    });
-
-
-</script>
+{% endif %}
 {% endblock scripts %}

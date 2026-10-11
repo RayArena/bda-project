@@ -48,13 +48,30 @@ def clean_text(text):
 
 class_index_mapping = {0: "Negative", 1: "Positive", 2: "Neutral", 3: "Irrelevant"}
 
-def classify_text(text: str) -> str:
+def classify_text(text: str) -> dict:
+    """Classify text and return the label plus the model's confidence.
+
+    Returns a dict:
+        {
+          "label": <str>,                 # predicted sentiment
+          "confidence": <float>,          # confidence (%) in the chosen class
+          "probabilities": {label: pct},  # full per-class probability distribution
+        }
+    """
     preprocessed_tweet = clean_text(text)
     data = [(preprocessed_tweet,)]
     df = spark.createDataFrame(data, ["Text"])
     processed_validation = pipeline.transform(df)
-    prediction = processed_validation.collect()[0][6]
+    row = processed_validation.select("prediction", "probability").collect()[0]
+    prediction = row["prediction"]
+    probability = row["probability"]
     label = class_index_mapping.get(int(prediction), "Neutral")
 
-    print(f"[Classify User] Text: {text} -> Sentiment: {label}")
-    return label
+    confidence = round(float(max(probability)) * 100, 2)
+    probabilities = {
+        class_index_mapping.get(i, str(i)): round(float(p) * 100, 2)
+        for i, p in enumerate(probability)
+    }
+
+    print(f"[Classify User] Text: {text} -> Sentiment: {label} ({confidence}%)")
+    return {"label": label, "confidence": confidence, "probabilities": probabilities}

@@ -1,60 +1,75 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %} Big Data Project {% endblock title %}
-
-
-{% block links %}
-    <!-- <link rel="stylesheet" href="{% static 'css/css-reset.css' %}">
-    <link rel="stylesheet" href="{% static 'css/normalize.css' %}"> -->
-    <link rel="stylesheet" href="{% static 'css/myCss-fm.css' %}">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-{% endblock links %}
-
+{% block title %} SentimentScope · Classify {% endblock title %}
+{% block nav_classify %}active{% endblock %}
 
 {% block content %}
+<div class="wrap">
 
-<header>
-    <div class="container flex-sp-bet">
-        <a href="{% url 'classify' %}">
-            <h2 class="logo">Classify Data</h2>
-        </a>
-        <nav class="nav">
-            <ul>
-                <li><a href="{% url 'dashboard' %}"><i class="fa-solid fa-house"></i> Dashboard</a></li>
-                <li><a href="{% url 'classify' %}"><i class="fa-solid fa-user-pen"></i> Classify</a></li>
-            </ul>
-        </nav>
+    <div class="page-head">
+        <h1>Classify Text</h1>
+        <p>Run any sentence through the PySpark logistic-regression model and see its predicted sentiment and accuracy.</p>
     </div>
-</header>
 
-<main class="flex-ctr-clm">
-    <div class="container flex-ctr-clm">
-        <h2>Text Classify using pyspark model : </h2>
-        <br>
-        <form method="post" enctype="multipart/form-data" class="flex-ctr-clm classify">
-            {% csrf_token %}
-            <textarea placeholder="Enter your text" name="text"></textarea>
-            <button type="submit" style="font-weight: 600;">Classify</button>
-        </form>
-        <br>
-        {% if text_len > 0 or error %}
+    <div class="classify-grid">
+
+        <!-- Input -->
+        <div class="card card-pad">
+            <div class="card-title"><i class="fa-solid fa-keyboard"></i> Your Text</div>
+            <form method="post">
+                {% csrf_token %}
+                <textarea name="text" placeholder="Type or paste a tweet / sentence here…">{{ text }}</textarea>
+                <button type="submit" class="btn-primary">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Classify
+                </button>
+            </form>
+        </div>
+
+        <!-- Result -->
+        <div class="card card-pad">
+            <div class="card-title"><i class="fa-solid fa-chart-simple"></i> Result</div>
+
             {% if error %}
-            <h3 style="color: red;">{{ error_text }}</h3>
+                <div class="alert"><i class="fa-solid fa-triangle-exclamation"></i> {{ error_text }}</div>
+            {% elif text_len > 0 %}
+                <div class="result-label">Predicted Sentiment</div>
+                <div class="result-sentiment">
+                    <span class="dot {{ prediction|lower }}"><i class="fa-solid fa-circle"></i></span>
+                    {{ prediction }}
+                </div>
+
+                {% if confidence is not None %}
+                <div class="conf-ring-wrap">
+                    <div class="conf-ring" style="--val: {{ confidence }}; --ring-color: var(--accent);">
+                        <div class="inner">{{ confidence }}%</div>
+                    </div>
+                    <div>
+                        <div class="result-label">Accuracy</div>
+                        <div class="conf-caption">Model confidence in this prediction.</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if probabilities %}
+                <div class="result-label" style="margin-top: 18px;">Per-class probability</div>
+                <div class="prob-list">
+                    {% for label, val in probabilities.items %}
+                    <div class="prob-row">
+                        <div class="prob-top"><span>{{ label }}</span><span>{{ val }}%</span></div>
+                        <div class="track"><div class="fill {{ label }}" style="width: {{ val }}%;"></div></div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="result-label" style="margin-top: 18px;">Input</div>
+                <div class="input-text-echo">{{ text }}</div>
             {% else %}
-            <ul>
-                <li>Text : {{ text }}</li>
-                <li>Prediction : <mark style="font-weight: 600;">{{ prediction }}</mark></li>
-            </ul>
+                <p style="color: var(--text-muted);">Enter some text and hit <strong>Classify</strong> to see the prediction and its accuracy.</p>
             {% endif %}
-        {% endif %}
+        </div>
 
     </div>
-</main>
-
+</div>
 {% endblock content %}
-
-
-{% block scripts %}
-<script src="{% static 'js/script.js' %}"></script>
-{% endblock scripts %}

@@ -129,23 +129,75 @@ def dashboard(request):
     if len_data == 0:
         context = {'len_data': len_data}
         return render(request, 'dashboard/index.html', context)
-    
-    sentiment_counts = {label: 0 for label in ['Negative', 'Positive', 'Neutral', 'Irrelevant']}
+
+    sentiment_counts = {label: 0 for label in class_list}
+    # Running sum of confidence per class so we can average it afterwards.
+    confidence_sums = {label: 0.0 for label in class_list}
+    confidence_values = []  # every prediction's confidence (for overall avg + histogram)
+
     for entry in data:
         pred = entry.get('prediction', 'Neutral')
         if pred in sentiment_counts:
             sentiment_counts[pred] += 1
+            conf = entry.get('confidence')
+            if conf is not None:
+                try:
+                    conf = float(conf)
+                    confidence_sums[pred] += conf
+                    confidence_values.append(conf)
+                except (TypeError, ValueError):
+                    pass
 
-    # Calculate the percentage of each class
+    # Percentage of each class
     sentiment_rates = {label: round((count / len_data) * 100, 2) for label, count in sentiment_counts.items()}
 
+    # Average confidence ("accuracy") per class
+    avg_confidence_per_class = {
+        label: (round(confidence_sums[label] / sentiment_counts[label], 2) if sentiment_counts[label] else 0)
+        for label in class_list
+    }
+
+    # Overall average confidence across every prediction that has one
+    overall_avg_confidence = round(sum(confidence_values) / len(confidence_values), 2) if confidence_values else None
+
+    # Confidence distribution buckets (for a histogram chart)
+    confidence_buckets = {'0-50%': 0, '50-70%': 0, '70-85%': 0, '85-95%': 0, '95-100%': 0}
+    for conf in confidence_values:
+        if conf < 50:
+            confidence_buckets['0-50%'] += 1
+        elif conf < 70:
+            confidence_buckets['50-70%'] += 1
+        elif conf < 85:
+            confidence_buckets['70-85%'] += 1
+        elif conf < 95:
+            confidence_buckets['85-95%'] += 1
+        else:
+            confidence_buckets['95-100%'] += 1
+
     plot_word_frequencies_per_class(data)
+
+    # Combined per-class stats so the template can iterate without dict lookups.
+    color_map = {'Negative': '#ef4444', 'Positive': '#22c55e', 'Neutral': '#3b82f6', 'Irrelevant': '#f59e0b'}
+    class_stats = [
+        {
+            'label': label,
+            'count': sentiment_counts[label],
+            'rate': sentiment_rates[label],
+            'avg_confidence': avg_confidence_per_class[label],
+            'color': color_map[label],
+        }
+        for label in class_list
+    ]
 
     context = {
         'data': data,
         'len_data': len_data,
         'sentiment_rates': sentiment_rates,
         'sentiment_counts': sentiment_counts,
+        'avg_confidence_per_class': avg_confidence_per_class,
+        'overall_avg_confidence': overall_avg_confidence,
+        'confidence_buckets': confidence_buckets,
+        'class_stats': class_stats,
     }
     return render(request, 'dashboard/index.html', context)
 
@@ -154,6 +206,8 @@ def classify(request):
     error = False
     error_text = ""
     prediction = ""
+    confidence = None
+    probabilities = {}
     text = ""
 
     if request.method == 'POST':
@@ -162,7 +216,14 @@ def classify(request):
             error = False
             try:
                 from .consumer_user import classify_text
-                prediction = classify_text(text)
+                result = classify_text(text)
+                # Backwards compatible: classify_text may return a plain string
+                if isinstance(result, dict):
+                    prediction = result.get('label', '')
+                    confidence = result.get('confidence')
+                    probabilities = result.get('probabilities', {})
+                else:
+                    prediction = result
             except Exception as e:
                 error = True
                 error_text = f"Classification model error: {e}"
@@ -174,6 +235,8 @@ def classify(request):
         "error": error,
         "error_text": error_text,
         "prediction": prediction,
+        "confidence": confidence,
+        "probabilities": probabilities,
         "text": text,
         "text_len": len(text.strip())
     }
