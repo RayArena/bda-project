@@ -1,20 +1,43 @@
 import os
 import sys
 import re
+import platform
 from pathlib import Path
 # Reconfigure standard output to handle emojis safely on Windows consoles
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-# Ensure PYSPARK_PYTHON and HADOOP_HOME are set on Windows
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env as early as possible so every path
+# below (JAVA_HOME, HADOOP_HOME, MODEL_PATH, ...) can be overridden there.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ROOT_DIR / ".env")
+except ImportError:
+    pass
+
+# Ensure PYSPARK_PYTHON points at the running interpreter
 os.environ["PYSPARK_PYTHON"] = sys.executable
 os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
-ROOT_DIR = Path(__file__).resolve().parent.parent
-hadoop_dir = ROOT_DIR / "hadoop"
-if hadoop_dir.exists():
-    os.environ["HADOOP_HOME"] = str(hadoop_dir)
-    os.environ["PATH"] = str(hadoop_dir / "bin") + os.pathsep + os.environ.get("PATH", "")
+
+# JAVA_HOME: honor .env override if provided
+java_home = os.getenv("JAVA_HOME")
+if java_home:
+    os.environ["JAVA_HOME"] = java_home
+
+# HADOOP_HOME: only needed on Windows (winutils). Use .env value if set,
+# otherwise auto-detect the bundled ./hadoop folder on Windows only.
+hadoop_home = os.getenv("HADOOP_HOME")
+if not hadoop_home and platform.system() == "Windows":
+    bundled = ROOT_DIR / "hadoop"
+    if bundled.exists():
+        hadoop_home = str(bundled)
+if hadoop_home:
+    os.environ["HADOOP_HOME"] = hadoop_home
+    os.environ["PATH"] = str(Path(hadoop_home) / "bin") + os.pathsep + os.environ.get("PATH", "")
 
 # Fix Python 3.12+ / 3.13 Windows 'ValueError: Invalid file descriptor: -1' in kafka client
 import selectors
@@ -39,13 +62,6 @@ from pymongo import MongoClient
 from kafka import KafkaConsumer
 from pyspark.ml import PipelineModel
 from pyspark.sql import SparkSession
-
-# Load environment variables from .env file
-try:
-    from dotenv import load_dotenv
-    load_dotenv(ROOT_DIR / ".env")
-except ImportError:
-    pass
 
 # Connect to MongoDB (configurable via .env / environment variables)
 mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
@@ -75,11 +91,15 @@ spark = SparkSession.builder \
     .getOrCreate()
 spark.sparkContext.setLogLevel("WARN")
 
-# Load model resolving path dynamically
+# Resolve model path: MODEL_PATH from .env wins, else the in-repo default.
 SCRIPT_DIR = Path(__file__).resolve().parent
-model_path = SCRIPT_DIR / "logistic_regression_model.pkl"
-if not model_path.exists():
-    model_path = Path("logistic_regression_model.pkl")
+model_env = os.getenv("MODEL_PATH")
+if model_env:
+    model_path = Path(model_env)
+else:
+    model_path = SCRIPT_DIR / "logistic_regression_model.pkl"
+    if not model_path.exists():
+        model_path = Path("logistic_regression_model.pkl")
 
 print(f"Loading sentiment model from: {model_path}...")
 pipeline = PipelineModel.load(str(model_path))

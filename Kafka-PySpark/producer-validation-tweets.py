@@ -37,11 +37,15 @@ try:
 except ImportError:
     pass
 
-# Resolve path to twitter_validation.csv regardless of current working directory
+# Resolve path to the tweets CSV: VALIDATION_CSV from .env wins, else in-repo default.
 SCRIPT_DIR = Path(__file__).resolve().parent
-csv_path = SCRIPT_DIR / 'twitter_validation.csv'
-if not csv_path.exists():
-    csv_path = Path('twitter_validation.csv')
+csv_env = os.getenv('VALIDATION_CSV')
+if csv_env:
+    csv_path = Path(csv_env)
+else:
+    csv_path = SCRIPT_DIR / 'twitter_validation.csv'
+    if not csv_path.exists():
+        csv_path = Path('twitter_validation.csv')
 
 topic_name = os.getenv('KAFKA_TOPIC', 'numtest')
 kafka_bootstrap = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')

@@ -1,18 +1,37 @@
 import os
 import re
+import sys
+import platform
 from pathlib import Path
 import nltk
 
-import sys
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Ensure PYSPARK_PYTHON and HADOOP_HOME are set on Windows
+# Load .env early so JAVA_HOME / HADOOP_HOME / MODEL_PATH overrides apply.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ROOT_DIR / ".env")
+except ImportError:
+    pass
+
+# Ensure Spark uses this interpreter
 os.environ["PYSPARK_PYTHON"] = sys.executable
 os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-hadoop_dir = ROOT_DIR / "hadoop"
-if hadoop_dir.exists():
-    os.environ["HADOOP_HOME"] = str(hadoop_dir)
-    os.environ["PATH"] = str(hadoop_dir / "bin") + os.pathsep + os.environ.get("PATH", "")
+
+# JAVA_HOME from .env if provided
+java_home = os.getenv("JAVA_HOME")
+if java_home:
+    os.environ["JAVA_HOME"] = java_home
+
+# HADOOP_HOME: .env value, else auto-detect bundled ./hadoop on Windows only.
+hadoop_home = os.getenv("HADOOP_HOME")
+if not hadoop_home and platform.system() == "Windows":
+    bundled = ROOT_DIR / "hadoop"
+    if bundled.exists():
+        hadoop_home = str(bundled)
+if hadoop_home:
+    os.environ["HADOOP_HOME"] = hadoop_home
+    os.environ["PATH"] = str(Path(hadoop_home) / "bin") + os.pathsep + os.environ.get("PATH", "")
 
 from pyspark.ml import PipelineModel
 from pyspark.sql import SparkSession
@@ -28,11 +47,15 @@ spark = SparkSession.builder \
     .getOrCreate()
 spark.sparkContext.setLogLevel("WARN")
 
-# Resolve model path dynamically
+# Resolve model path: MODEL_PATH from .env wins, else the in-repo defaults.
 BASE_DIR = Path(__file__).resolve().parent.parent
-model_path = BASE_DIR / "logistic_regression_model.pkl"
-if not model_path.exists():
-    model_path = BASE_DIR.parent / "Kafka-PySpark" / "logistic_regression_model.pkl"
+model_env = os.getenv("MODEL_PATH")
+if model_env:
+    model_path = Path(model_env)
+else:
+    model_path = BASE_DIR / "logistic_regression_model.pkl"
+    if not model_path.exists():
+        model_path = BASE_DIR.parent / "Kafka-PySpark" / "logistic_regression_model.pkl"
 
 pipeline = PipelineModel.load(str(model_path))
 
